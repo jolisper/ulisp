@@ -1,0 +1,7 @@
+(module
+    (def main () 
+        (inc 3))
+
+    (def inc (n) 
+        (+ n 1))
+)

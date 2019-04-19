@@ -1,0 +1,9 @@
+[package]
+name = "ulisp"
+version = "0.1.0"
+authors = ["Jorge Luis Pérez <jorge.perez@almundo.com>"]
+edition = "2018"
+
+[dependencies]
+lazy_static = "1.3.0"
+structopt = "0.2.15"
