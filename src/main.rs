@@ -32,21 +32,9 @@ fn main() {
     let asmfile = &format!("{}.asm", input);
     write_asm(asmfile, asm);
 
-    Command::new("nasm")
-        .arg("-f")
-        .arg("elf64")
-        .arg(asmfile)
-        .output()
-        .expect("failed to run nasm");
-
-    let objfile = &format!("{}.o", input);
-
-    Command::new("gcc")
-        .arg("-o")
-        .arg(output)
-        .arg(objfile)
-        .output()
-        .expect("failed to run gcc");
+    let objfile = run_assembler(asmfile, input);
+    
+    run_linker(&objfile, &output);
 }
 
 fn read_input(input: &str) -> String {
@@ -63,4 +51,26 @@ fn write_asm(output: &str, asm: String) {
         .expect("failed open output file");
     output.write_all(asm.as_bytes())
         .expect("failed write output file");
+}
+
+fn run_assembler(asmfile: &str, codefile: &str) -> String {
+    let objfile = format!("{}.o", codefile);
+    Command::new("nasm")
+        .arg("-f")
+        .arg("elf64")
+        .arg("-o")
+        .arg(&objfile)
+        .arg(asmfile)
+        .output()
+        .expect("failed to run nasm");
+    objfile
+}
+
+fn run_linker(objfile: &str, binary: &str) {
+    Command::new("gcc")
+        .arg("-o")
+        .arg(binary)
+        .arg(objfile)
+        .output()
+        .expect("failed to run gcc");
 }
