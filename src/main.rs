@@ -1,14 +1,14 @@
 extern crate structopt;
 
+mod backend;
 mod compiler;
 mod parser;
 
-use compiler::compile;
+use backend::BackendOpt;
 use parser::parse;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path;
-use std::process::Command;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -17,6 +17,8 @@ struct Opt {
     input: path::PathBuf,
     #[structopt(short = "o", long = "output", default_value = "a.out")]
     output: path::PathBuf,
+    #[structopt(short = "b", long = "backend", default_value = "x86")]
+    backend: BackendOpt,
 }
 
 fn main() {
@@ -24,17 +26,14 @@ fn main() {
 
     let input = opt.input.to_str().unwrap();
     let output = opt.output.to_str().unwrap();
+    let backend = opt.backend;
 
     let code = read_input(input);   
     let ast = parse(&code);
-    let asm = compile(&ast);
 
-    let asmfile = &format!("{}.asm", input);
-    write_asm(asmfile, asm);
-
-    let objfile = run_assembler(asmfile, input);
-    
-    run_linker(&objfile, &output);
+    let mut backend = backend::create(backend);
+    let asm = backend.compile(&ast);
+    backend.build(asm, &input, &output);
 }
 
 fn read_input(input: &str) -> String {
@@ -44,33 +43,4 @@ fn read_input(input: &str) -> String {
     input.read_to_string(&mut code)
         .expect("failed read input file");
     code
-}
-
-fn write_asm(output: &str, asm: String) {
-    let mut output = fs::File::create(output)
-        .expect("failed open output file");
-    output.write_all(asm.as_bytes())
-        .expect("failed write output file");
-}
-
-fn run_assembler(asmfile: &str, codefile: &str) -> String {
-    let objfile = format!("{}.o", codefile);
-    Command::new("nasm")
-        .arg("-f")
-        .arg("elf64")
-        .arg("-o")
-        .arg(&objfile)
-        .arg(asmfile)
-        .output()
-        .expect("failed to run nasm");
-    objfile
-}
-
-fn run_linker(objfile: &str, binary: &str) {
-    Command::new("gcc")
-        .arg("-o")
-        .arg(binary)
-        .arg(objfile)
-        .output()
-        .expect("failed to run gcc");
 }

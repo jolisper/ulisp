@@ -1,7 +1,11 @@
+use crate::backend::Backend;
 use crate::parser::Expression;
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::process::Command;
+use std::fs;
+use std::io::Write;
 
 type PrimitiveFunction =
     fn(args: &[Expression], destination: Option<&str>, scope: &mut HashMap<String, String>) -> ();
@@ -22,6 +26,35 @@ lazy_static! {
 
 thread_local! {
     static OUTPUT: RefCell<String> = RefCell::new(String::new());
+}
+
+struct X86;
+
+impl X86 {
+    fn new() -> Self { X86 {} }
+}
+
+impl Backend for X86 {
+    fn compile(&mut self, ast: &Expression) -> String {
+        emit_prefix();
+        let mut scope = HashMap::<String, String>::new();
+        compile_expression(ast, None, &mut scope);
+        emit_postfix();
+
+        OUTPUT.with(|f| f.borrow().to_string())
+    }
+
+    fn build(&mut self, asm: String, input: &str, output: &str) {
+        let asmfile = &format!("{}.asm", input);
+        write_asm(asmfile, asm);
+
+        let objfile = run_assembler(asmfile, &input);
+        run_linker(&objfile, &output);
+    }
+}
+
+pub(crate) fn new() -> Box<Backend> {
+    Box::new(X86::new())
 }
 
 const PARAM_REGISTERS: &[&str] = &["rdi", "rsi", "rdx"];
@@ -205,4 +238,66 @@ where
         f.borrow_mut()
             .push_str(&format!("{}{}\n", indent, code.into()));
     })
+}
+
+fn emit_prefix() {
+    emit(0, "; Generated with ulisp");
+    emit(0, ";");
+    emit(0, "; To compile run the following:");
+    emit(0, "; $ nasm -f elf64 program.asm");
+    emit(0, "; $ gcc -o program program.o");
+    emit(0, "");
+
+    emit(1, "global main\n");
+
+    emit(1, "SECTION .text\n");
+
+    emit(0, "plus:");
+    emit(1, "add rdi, rsi");
+    emit(1, "mov rax, rdi");
+    emit(1, "ret\n");
+}
+
+fn emit_postfix() {
+    let mut syscall_map = HashMap::new();
+    if cfg!(darwin) {
+        syscall_map.insert("exit", "0x2000001");
+    } else {
+        syscall_map.insert("exit", "60");
+    }
+
+    emit(0, "main:");
+    emit(1, "call program_main");
+    emit(1, "mov rdi, rax");
+    emit(1, format!("mov rax, {}", syscall_map["exit"]));
+    emit(1, "syscall");
+}
+
+fn run_assembler(asmfile: &str, codefile: &str) -> String {
+    let objfile = format!("{}.o", codefile);
+    Command::new("nasm")
+        .arg("-f")
+        .arg("elf64")
+        .arg("-o")
+        .arg(&objfile)
+        .arg(asmfile)
+        .output()
+        .expect("failed to run nasm");
+    objfile
+}
+
+fn run_linker(objfile: &str, binary: &str) {
+    Command::new("gcc")
+        .arg("-o")
+        .arg(binary)
+        .arg(objfile)
+        .output()
+        .expect("failed to run gcc");
+}
+
+fn write_asm(output: &str, asm: String) {
+    let mut output = fs::File::create(output)
+        .expect("failed open output file");
+    output.write_all(asm.as_bytes())
+        .expect("failed write output file");
 }
