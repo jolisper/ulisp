@@ -3,6 +3,7 @@ mod x86;
 
 use std::fmt;
 use std::str::FromStr;
+use std::collections::HashMap;
 use crate::parser::Expression;
 
 #[derive(Debug)]
@@ -51,6 +52,33 @@ pub(crate) trait Backend {
     fn compile(&mut self, ast: &Expression) -> String;
 
     fn build(&mut self, asm: String, input: &str, output: &str);
+
+    fn compile_expression(
+        &mut self, 
+        arg: &Expression, 
+        destination: Option<&str>, 
+        scope: &mut HashMap<String, String>);
+
+    fn compile_call(
+        &mut self,
+        function: &str,
+        args: &[Expression],
+        destination: Option<&str>,
+        scope: &mut HashMap<String, String>);
+
+    fn compile_define(
+        &mut self,
+        args: &[Expression],
+        _destination: Option<&str>,
+        scope: &mut HashMap<String, String>);
+
+    fn compile_module(
+        &mut self,
+        args: &[Expression],
+        destination: Option<&str>,
+        scope: &mut HashMap<String, String>);
+    
+    fn emit<T>(&mut self, depth: usize, code: T) where T: Into<String>, Self: Sized;
 }
 
 pub(crate) fn create(backend: BackendOpt) -> Box<Backend> {
