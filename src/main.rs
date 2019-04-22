@@ -1,7 +1,6 @@
 extern crate structopt;
 
 mod backend;
-mod compiler;
 mod parser;
 
 use backend::BackendOpt;
