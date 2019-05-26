@@ -6,15 +6,17 @@ use std::fs;
 use std::io::Write;
 use std::process::Command;
 
+pub type Scope = HashMap<String, String>;
+
 type PrimitiveFunction =
-    fn(&mut X86, args: &[Expression], destination: Option<&str>, scope: &mut HashMap<String, String>) -> ();
+    fn(&mut X86, args: &[Expression], destination: Option<&str>, scope: &mut Scope) -> ();
 
 const PARAM_REGISTERS: &[&str] = &["rdi", "rsi", "rdx"];
 const LOCAL_REGISTERS: &[&str] = &["rbx", "rbp", "r12"];
 
 struct X86 {
     primitive_functions: HashMap<String, PrimitiveFunction>,
-    builtin_functions: HashMap<String, String>,
+    builtin_functions: Scope,
     output: RefCell<String>,
 }
 
@@ -104,6 +106,8 @@ impl X86 {
 }
 
 impl Backend for X86 {
+    type S = Scope;
+
     fn compile(&mut self, ast: &Expression) -> String {
         self.emit_prefix();
         let mut scope = HashMap::<String, String>::new();
@@ -125,7 +129,7 @@ impl Backend for X86 {
         &mut self,
         arg: &Expression,
         destination: Option<&str>,
-        scope: &mut HashMap<String, String>,
+        scope: &mut Scope,
     ) {
         #[allow(unused_assignments)]
         let mut origin: Option<String> = None;
@@ -166,7 +170,7 @@ impl Backend for X86 {
         function: &str,
         args: &[Expression],
         destination: Option<&str>,
-        scope: &mut HashMap<String, String>,
+        scope: &mut Scope,
     ) {
         if let Some(fun) = self.primitive_functions.get(function) {
             fun(self, args, destination, scope);
@@ -188,8 +192,7 @@ impl Backend for X86 {
             1,
             format!(
                 "call {}",
-                self
-                    .builtin_functions
+                self.builtin_functions
                     .get(function)
                     .unwrap_or(&function.to_string())
             ),
@@ -257,22 +260,21 @@ impl Backend for X86 {
     }
 
     fn emit<T>(&mut self, depth: usize, code: T)
-        where T: 
-        Into<String>,
+    where
+        T: Into<String>,
     {
         let mut indent = String::with_capacity(depth);
         for _ in 0..depth {
             indent.push_str("\t");
         }
-        
+
         self.output
             .borrow_mut()
             .push_str(&format!("{}{}\n", indent, code.into()));
     }
-
 }
 
-pub(crate) fn new() -> Box<Backend> {
+pub(crate) fn new() -> Box<Backend<S = Scope>> {
     Box::new(X86::new())
 }
 

@@ -1,10 +1,9 @@
-mod llvm;
-mod x86;
+pub mod llvm;
+pub mod x86;
 
+use crate::parser::Expression;
 use std::fmt;
 use std::str::FromStr;
-use std::collections::HashMap;
-use crate::parser::Expression;
 
 #[derive(Debug)]
 pub(crate) struct BackendOptError {
@@ -49,41 +48,43 @@ impl FromStr for BackendOpt {
 }
 
 pub(crate) trait Backend {
+    type S;
+
     fn compile(&mut self, ast: &Expression) -> String;
 
     fn build(&mut self, asm: String, input: &str, output: &str);
 
     fn compile_expression(
-        &mut self, 
-        arg: &Expression, 
-        destination: Option<&str>, 
-        scope: &mut HashMap<String, String>);
+        &mut self,
+        arg: &Expression,
+        destination: Option<&str>,
+        scope: &mut Self::S,
+    );
 
     fn compile_call(
         &mut self,
         function: &str,
         args: &[Expression],
         destination: Option<&str>,
-        scope: &mut HashMap<String, String>);
+        scope: &mut Self::S,
+    );
 
     fn compile_define(
         &mut self,
         args: &[Expression],
         _destination: Option<&str>,
-        scope: &mut HashMap<String, String>);
+        scope: &mut Self::S,
+    );
 
     fn compile_module(
         &mut self,
         args: &[Expression],
         destination: Option<&str>,
-        scope: &mut HashMap<String, String>);
-    
-    fn emit<T>(&mut self, depth: usize, code: T) where T: Into<String>, Self: Sized;
-}
+        scope: &mut Self::S,
+    );
 
-pub(crate) fn create(backend: BackendOpt) -> Box<Backend> {
-    match backend {
-        BackendOpt::LLVM => unimplemented!("llvm backend not implemented, yet"),
-        BackendOpt::X86 => x86::new(),
-    }
+    fn emit<T>(&mut self, depth: usize, code: T)
+    where
+        T: Into<String>,
+        Self: Sized;
 }

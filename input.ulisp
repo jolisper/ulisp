@@ -1,7 +1,7 @@
 (module
-    (def main () 
-        (inc 3))
+    (def plus-two (a b)
+        (+ a (+ b 2)))
 
-    (def inc (n) 
-        (+ n 1))
+    (def main ()
+        (plus-two 3 (plus-two 1 1)))    
 )

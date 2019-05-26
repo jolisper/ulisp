@@ -2,5 +2,7 @@
 /target
 **/*.rs.bk
 *.asm
+*.ll
 *.o
 *.out
+*.s

@@ -3,8 +3,10 @@ extern crate structopt;
 mod backend;
 mod parser;
 
-use backend::BackendOpt;
-use parser::parse;
+use backend::llvm::Scope as llvm_Scope;
+use backend::x86::Scope as x86_Scope;
+use backend::{llvm, x86, Backend, BackendOpt};
+use parser::{parse, Expression};
 use std::fs;
 use std::io::Read;
 use std::path;
@@ -20,6 +22,9 @@ struct Opt {
     backend: BackendOpt,
 }
 
+type X86 = Box<dyn Backend<S = x86_Scope>>;
+type LLVM = Box<dyn Backend<S = llvm_Scope>>;
+
 fn main() {
     let opt = Opt::from_args();
 
@@ -27,19 +32,30 @@ fn main() {
     let output = opt.output.to_str().unwrap();
     let backend = opt.backend;
 
-    let code = read_input(input);   
+    let code = read_input(input);
     let ast = parse(&code);
 
-    let mut backend = backend::create(backend);
+    match backend {
+        BackendOpt::X86 => run_x86_backend(x86::new(), ast, input, output),
+        BackendOpt::LLVM => run_llvm_backend(llvm::new(), ast, input, output),
+    }
+}
+
+fn run_x86_backend(mut backend: X86, ast: Expression, input: &str, output: &str) {
+    let asm = backend.compile(&ast);
+    backend.build(asm, input, output);
+}
+
+fn run_llvm_backend(mut backend: LLVM, ast: Expression, input: &str, output: &str) {
     let asm = backend.compile(&ast);
     backend.build(asm, &input, &output);
 }
 
 fn read_input(input: &str) -> String {
-    let mut input = fs::File::open(input)
-        .expect("failed open input file");
+    let mut input = fs::File::open(input).expect("failed open input file");
     let mut code = String::new();
-    input.read_to_string(&mut code)
+    input
+        .read_to_string(&mut code)
         .expect("failed read input file");
     code
 }
