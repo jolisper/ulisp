@@ -44,5 +44,8 @@ impl Scope {
 }
 
 pub(crate) fn safe_name(symbol_name: &str) -> String {
+    if symbol_name == "-" {
+        return symbol_name.to_owned();
+    }
     symbol_name.replace("-", "_")
 }
