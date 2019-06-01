@@ -18,7 +18,7 @@ struct Opt {
     input: path::PathBuf,
     #[structopt(short = "o", long = "output", default_value = "a.out")]
     output: path::PathBuf,
-    #[structopt(short = "b", long = "backend", default_value = "x86")]
+    #[structopt(short = "b", long = "backend", default_value = "llvm")]
     backend: BackendOpt,
 }
 
