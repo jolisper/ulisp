@@ -1,0 +1,7 @@
+(module
+    (def sub-two (a b)
+        (- a (- b 2)))
+
+    (def main ()
+        (sub-two 3 (sub-two 1 1)))    
+)
