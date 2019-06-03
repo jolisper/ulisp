@@ -41,7 +41,7 @@ impl Scope {
 
     pub fn copy(&mut self) -> Scope {
         self.clone()
-    }   
+    }
 }
 
 pub(crate) fn safe_name(symbol_name: &str) -> String {

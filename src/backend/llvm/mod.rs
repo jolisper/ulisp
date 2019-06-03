@@ -259,12 +259,12 @@ impl LLVM {
             let false_label = scope.symbol(Some("iffalse"));
 
             backend.emit(
-                1, 
+                1,
                 format!(
-                    "br i1 %{}, label %{}, label %{}", 
-                    test_var, 
-                    true_label, 
-                    false_label));
+                    "br i1 %{}, label %{}, label %{}",
+                    test_var, true_label, false_label
+                ),
+            );
 
             // Compile true section
             backend.emit(0, format!("{}:", true_label));
@@ -279,12 +279,19 @@ impl LLVM {
             // Compile false section
             let tmp2 = scope.symbol(None);
             backend.compile_expression(else_block, Some(&tmp2), scope);
-            backend.emit(1, format!("store i32 %{}, i32* %{}, align 4", tmp2, result)); 
+            backend.emit(1, format!("store i32 %{}, i32* %{}, align 4", tmp2, result));
             backend.emit(1, format!("br label %{}", end_label));
 
             // Clean up
             backend.emit(0, format!("{}:", end_label));
-            backend.emit(1, format!("%{} = load i32, i32* %{}, align 4", destination.unwrap(), result));
+            backend.emit(
+                1,
+                format!(
+                    "%{} = load i32, i32* %{}, align 4",
+                    destination.unwrap(),
+                    result
+                ),
+            );
         };
         Rc::new(c)
     }
