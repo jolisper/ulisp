@@ -26,9 +26,10 @@ impl Scope {
         copy
     }
 
-    pub fn symbol(&mut self) -> String {
+    pub fn symbol(&mut self, prefix: Option<&str>) -> String {
         let nth = self.locals.len() + 1;
-        self.register(format!("{}{}", "sym", nth))
+        let prefix = prefix.unwrap_or_else(|| "sym");
+        self.register(format!("{}{}", prefix, nth))
     }
 
     pub fn get(&mut self, local: &str) -> Option<String> {

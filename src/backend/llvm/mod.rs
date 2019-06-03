@@ -31,13 +31,11 @@ impl Backend for LLVM {
         }
         let s: String = code.into();
         self.output.push_str(&format!("{}{}\n", indent, s.clone()));
-
-        //println!("{}{}", indent, s.clone());
     }
 
     fn compile(&mut self, ast: &Expression) -> String {
         let mut scope = Scope::new();
-        let destination = scope.symbol();
+        let destination = scope.symbol(None);
         self.compile_expression(ast, Some(&destination), &mut scope);
         self.output.clone()
     }
@@ -97,14 +95,13 @@ impl Backend for LLVM {
         let valid_function = if let Some(f) = scope.get(function) {
             f
         } else {
-            //println!("{:?} => {:?}", function, self.primitive_functions.get(function).is_some());
             panic!("Attempt to call undefined function: {}", function);
         };
 
         let safe_args = args
             .iter()
             .map(|arg| {
-                let sym = scope.symbol();
+                let sym = scope.symbol(None);
                 self.compile_expression(arg, Some(&sym), scope);
                 format!("i32 %{}", sym)
             })
@@ -158,8 +155,7 @@ impl Backend for LLVM {
 
         self.emit(0, format!("define i32 @{}({}) {{", safe_name, safe_params));
 
-        let ret = child_scope.symbol();
-        //println!("ret={}", ret);
+        let ret = child_scope.symbol(None);
         self.compile_expression(body, Some(&ret), &mut child_scope);
 
         self.emit(1, format!("ret i32 %{}", ret));
@@ -195,6 +191,8 @@ impl LLVM {
             m.insert("+".to_string(), Self::compile_operation("add"));
             m.insert("-".to_string(), Self::compile_operation("sub"));
             m.insert("*".to_string(), Self::compile_operation("mul"));
+            m.insert("<".to_string(), Self::compile_operation("icmp slt"));
+            m.insert("if".to_string(), Self::compile_if());
             m
         };
         let output = String::new();
@@ -223,8 +221,8 @@ impl LLVM {
             let exp1 = &expressions[0];
             let exp2 = &expressions[1];
 
-            let arg1 = scope.symbol();
-            let arg2 = scope.symbol();
+            let arg1 = scope.symbol(None);
+            let arg2 = scope.symbol(None);
 
             backend.compile_expression(exp1, Some(&arg1), scope);
             backend.compile_expression(exp2, Some(&arg2), scope);
@@ -238,6 +236,55 @@ impl LLVM {
                     arg2
                 ),
             );
+        };
+        Rc::new(c)
+    }
+
+    fn compile_if() -> PrimitiveFunction {
+        let c = move |backend: &mut LLVM,
+                      expressions: &[Expression],
+                      destination: Option<&str>,
+                      scope: &mut Scope| {
+            let test_var = scope.symbol(None);
+            let result = scope.symbol(Some("ifresult"));
+            // Space for result
+            backend.emit(1, format!("%{} = alloca i32, align 4", result));
+
+            let test = &expressions[0];
+            let then_block = &expressions[1];
+            let else_block = &expressions[2];
+
+            backend.compile_expression(test, Some(&test_var), scope);
+            let true_label = scope.symbol(Some("iftrue"));
+            let false_label = scope.symbol(Some("iffalse"));
+
+            backend.emit(
+                1, 
+                format!(
+                    "br i1 %{}, label %{}, label %{}", 
+                    test_var, 
+                    true_label, 
+                    false_label));
+
+            // Compile true section
+            backend.emit(0, format!("{}:", true_label));
+            let tmp1 = scope.symbol(None);
+            backend.compile_expression(then_block, Some(&tmp1), scope);
+            backend.emit(1, format!("store i32 %{}, i32* %{}, align 4", tmp1, result));
+
+            let end_label = scope.symbol(Some("ifend"));
+            backend.emit(1, format!("br label %{}", end_label));
+            backend.emit(0, format!("{}:", false_label));
+
+            // Compile false section
+            let tmp2 = scope.symbol(None);
+            backend.compile_expression(else_block, Some(&tmp2), scope);
+            backend.emit(1, format!("store i32 %{}, i32* %{}, align 4", tmp2, result)); 
+            backend.emit(1, format!("br label %{}", end_label));
+
+            // Clean up
+            backend.emit(0, format!("{}:", end_label));
+            backend.emit(1, format!("%{} = load i32, i32* %{}, align 4", destination.unwrap(), result));
         };
         Rc::new(c)
     }
